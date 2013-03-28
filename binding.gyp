@@ -16,8 +16,11 @@
       , 'libraries': [
           '<!@(pkg-config --libs opencv)'
         ]
+        ,'include_dirs': [
+          '<!@(pkg-config --cflags "opencv >= 2.4.4" )'
+        ]
       , 'cflags': [
-            '<!@(pkg-config --cflags --libs "opencv >= 2.3.1" )'
+            '<!@(pkg-config --cflags --libs "opencv >= 2.4.4" )'
             , '-Wall'
           ]
       , 'cflags!' : [ '-fno-exceptions']
