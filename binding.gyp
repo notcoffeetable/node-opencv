@@ -16,7 +16,7 @@
       , "conditions": [
          ['OS=="win"', { #windows needs include dirs passed to MSBUILD this way
             'include_dirs': [              
-              '<!@(set PKG_CONFIG_PATH=%CD%&& pkg-config --cflags "opencv >= 2.3.1" )'
+              '<!@(pkg-config --cflags "opencv >= 2.3.1" )'
             ],
           }],
          ['OS=="mac"', {
