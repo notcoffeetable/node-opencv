@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=C:/src/opencv
+exec_prefix=${prefix}/bin
+libdir=${prefix}/build/x86/vc11/lib
+includedir_old=${prefix}/build/include/opencv
+includedir_new=${prefix}/build/include
+
+Name: OpenCV
+Description: Open Source Computer Vision Library
+Version: 2.4.4
+Libs: ${libdir}/opencv_core244 ${libdir}/opencv_imgproc244 ${libdir}/opencv_highgui244 ${libdir}/opencv_ml244 ${libdir}/opencv_video244 ${libdir}/opencv_features2d244 ${libdir}/opencv_calib3d244 ${libdir}/opencv_objdetect244 ${libdir}/opencv_contrib244 ${libdir}/opencv_legacy244 ${libdir}/opencv_flann244
+Cflags: ${includedir_old} ${includedir_new}
