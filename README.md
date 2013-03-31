@@ -11,13 +11,13 @@ People are using node-opencv to fly control quadrocoptors, detect faces from web
 
 You'll need OpenCV 2.4.4 installed.
 
-
 ### Windows Setup
-- Download and extract [OpenCV 2.4.4](http://opencv.org/) and place it in `C:\src`. 
-- Download [pkg-config](http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/). 
-- Edit `opencv.pc` and make sure that the paths inside match up to your OpenCV directory.
-- Create the environment variable PKG_CONFIG_PATH and point it to the directory containing `opencv.pc`.
-- Add `C:\src\opencv\build\x86\vc11\bin` (or your equivalent directory) to your PATH variable.
+#### Installing OpenCV and pkg-config
+- Download [OpenCV 2.4.4 for Windows](http://opencv.org/) and extract it somewhere convenient. 
+- Add the appropriate dll files to your system path (these are in /opencv/build/{x68 or x64}/bin directory).
+- Download [pkg-config](http://ftp.gnome.org/pub/gnome/binaries/win32/dependencies/), put it somewhere on your system path. 
+- You need an `opencv.pc` file so pkg-config can find the right paths for includes and libraries (an example is included in this repository). Make sure that the paths match up to your OpenCV directory.
+- Create the environment variable `PKG_CONFIG_PATH` and point it to the directory containing your `opencv.pc`.
 - Continue on to "Everyone Else"
 
 ### Everyone Else
