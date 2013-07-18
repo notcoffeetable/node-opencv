@@ -46,6 +46,7 @@ Matrix::Init(Handle<Object> target) {
 	NODE_SET_PROTOTYPE_METHOD(constructor, "save", Save);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "saveAsync", SaveAsync);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "resize", Resize);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "rotate", Rotate);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "pyrDown", PyrDown);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "pyrUp", PyrUp);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "channels", Channels);
@@ -54,6 +55,8 @@ Matrix::Init(Handle<Object> target) {
     NODE_SET_PROTOTYPE_METHOD(constructor, "convertHSVscale", ConvertHSVscale);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "gaussianBlur", GaussianBlur);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "copy", Copy);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "flip", Flip);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "roi", ROI);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "ptr", Ptr);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "addWeighted", AddWeighted);
 	NODE_SET_PROTOTYPE_METHOD(constructor, "split", Split);
@@ -69,6 +72,11 @@ Matrix::Init(Handle<Object> target) {
   NODE_SET_PROTOTYPE_METHOD(constructor, "houghLinesP", HoughLinesP);
 
 	NODE_SET_PROTOTYPE_METHOD(constructor, "inRange", inRange);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "adjustROI", AdjustROI);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "locateROI", LocateROI);
+
+	NODE_SET_PROTOTYPE_METHOD(constructor, "threshold", Threshold);
+	NODE_SET_PROTOTYPE_METHOD(constructor, "meanStdDev", MeanStdDev);
 
 	NODE_SET_METHOD(constructor, "Eye", Eye);
 
@@ -693,6 +701,54 @@ Matrix::Copy(const v8::Arguments& args) {
 
 
 Handle<Value>
+Matrix::Flip(const v8::Arguments& args) {
+	HandleScope scope;
+
+	Matrix *self = ObjectWrap::Unwrap<Matrix>(args.This());
+
+	if ( args.Length() < 1 || !args[0]->IsInt32() ) {
+		return v8::ThrowException(Exception::TypeError(String::New(
+			"Flip requires an integer flipCode argument (0 = X axis, positive = Y axis, negative = both axis)")));
+	}
+
+	int flipCode = args[0]->ToInt32()->Value();
+
+	Local<Object> img_to_return = Matrix::constructor->GetFunction()->NewInstance();
+	Matrix *img = ObjectWrap::Unwrap<Matrix>(img_to_return);
+	cv::flip(self->mat, img->mat, flipCode);
+
+	return scope.Close(img_to_return);
+}
+
+
+Handle<Value>
+Matrix::ROI(const v8::Arguments& args) {
+	HandleScope scope;
+
+	Matrix *self = ObjectWrap::Unwrap<Matrix>(args.This());
+
+	if ( args.Length() != 4 ) {
+		return v8::ThrowException(Exception::TypeError(String::New(
+			"ROI requires x,y,w,h arguments")));
+	}
+
+	// although it's an image to return, it is in fact a pointer to ROI of parent matrix
+	Local<Object> img_to_return = Matrix::constructor->GetFunction()->NewInstance();
+	Matrix *img = ObjectWrap::Unwrap<Matrix>(img_to_return);
+
+	int x = args[0]->IntegerValue();
+	int y = args[1]->IntegerValue();
+	int w = args[2]->IntegerValue();
+	int h = args[3]->IntegerValue();
+
+	cv::Mat roi(self->mat, cv::Rect(x,y,w,h));
+	img->mat = roi;
+
+	return scope.Close(img_to_return);
+}
+
+
+Handle<Value>
 Matrix::Ptr(const v8::Arguments& args) {
 	HandleScope scope;
 	Matrix *self = ObjectWrap::Unwrap<Matrix>(args.This());
@@ -923,6 +979,30 @@ Matrix::Resize(const v8::Arguments& args){
   return scope.Close(Undefined());
 }
 
+
+Handle<Value>
+Matrix::Rotate(const v8::Arguments& args){
+  HandleScope scope;
+
+  Matrix *self = ObjectWrap::Unwrap<Matrix>(args.This());
+  cv::Mat rotMatrix(2, 3, CV_32FC1);
+  cv::Mat res;
+
+  float angle = args[0]->ToNumber()->Value();
+  int x = args[1]->IsUndefined() ? round(self->mat.size().width / 2) : args[1]->Uint32Value();
+  int y = args[1]->IsUndefined() ? round(self->mat.size().height / 2) : args[2]->Uint32Value();
+
+  cv::Point center = cv::Point(x,y);
+
+  rotMatrix = getRotationMatrix2D(center, angle, 1.0);
+
+  cv::warpAffine(self->mat, res, rotMatrix, self->mat.size());
+  ~self->mat;
+  self->mat = res;
+
+  return scope.Close(Undefined());
+}
+
 Handle<Value>
 Matrix::PyrDown(const v8::Arguments& args){
 	SETUP_FUNCTION(Matrix)
@@ -964,4 +1044,94 @@ Matrix::inRange(const v8::Arguments& args) {
 
 
 	return scope.Close(v8::Null());
+}
+
+Handle<Value>
+Matrix::AdjustROI(const v8::Arguments& args) {
+	SETUP_FUNCTION(Matrix)
+  int dtop = args[0]->Uint32Value();
+  int dbottom = args[1]->Uint32Value();
+  int dleft = args[2]->Uint32Value();
+  int dright = args[3]->Uint32Value();
+
+  self->mat.adjustROI(dtop, dbottom, dleft, dright);
+
+  return scope.Close(v8::Null());
+
+}
+
+Handle<Value>
+Matrix::LocateROI(const v8::Arguments& args) {
+	SETUP_FUNCTION(Matrix)
+ 
+  cv::Size wholeSize;
+  cv::Point ofs;
+
+  self->mat.locateROI(wholeSize, ofs);
+
+	v8::Local<v8::Array> arr = v8::Array::New(4);
+	arr->Set(0, Number::New(wholeSize.width));
+	arr->Set(1, Number::New(wholeSize.height));
+	arr->Set(2, Number::New(ofs.x));
+	arr->Set(3, Number::New(ofs.y));
+
+	return scope.Close(arr);
+}
+
+Handle<Value>
+Matrix::Threshold(const v8::Arguments& args) {
+	SETUP_FUNCTION(Matrix)
+
+	double threshold = args[0]->NumberValue();
+	double maxVal = args[1]->NumberValue();
+
+  int typ = cv::THRESH_BINARY;
+	if (args.Length() == 3){
+//    typ = args[2]->IntegerValue();
+    String::AsciiValue typstr(args[2]);
+    if (strcmp(*typstr, "Binary") == 0){
+      typ=0;
+    }
+    if (strcmp(*typstr, "Binary Inverted") == 0){
+      typ=1;
+    }
+    if (strcmp(*typstr, "Threshold Truncated") == 0){
+      typ=2;
+    }
+    if (strcmp(*typstr, "Threshold to Zero") == 0){
+      typ=3;
+    }
+    if (strcmp(*typstr, "Threshold to Zero Inverted") == 0){
+      typ=4;
+    }
+  }
+
+
+
+	Local<Object> img_to_return = Matrix::constructor->GetFunction()->NewInstance();
+	Matrix *img = ObjectWrap::Unwrap<Matrix>(img_to_return);
+	self->mat.copyTo(img->mat);
+
+  cv::threshold(self->mat, img->mat, threshold, maxVal, typ);
+
+	return scope.Close(img_to_return);
+}
+
+Handle<Value>
+Matrix::MeanStdDev(const v8::Arguments& args) {
+	HandleScope scope;
+
+	Matrix *self = ObjectWrap::Unwrap<Matrix>(args.This());
+
+	Local<Object> mean = Matrix::constructor->GetFunction()->NewInstance();
+	Matrix *m_mean = ObjectWrap::Unwrap<Matrix>(mean);
+	Local<Object> stddev = Matrix::constructor->GetFunction()->NewInstance();
+	Matrix *m_stddev = ObjectWrap::Unwrap<Matrix>(stddev);
+
+	cv::meanStdDev(self->mat, m_mean->mat, m_stddev->mat);
+
+	Local<Object> data = Object::New();
+	data->Set(String::NewSymbol("mean"), mean);
+	data->Set(String::NewSymbol("stddev"), stddev);
+	return scope.Close(data);
 }
