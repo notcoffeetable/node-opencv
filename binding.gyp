@@ -23,6 +23,11 @@
       , 'cflags!' : [ '-fno-exceptions']
       , 'cflags_cc!': [ '-fno-rtti',  '-fno-exceptions']
       , "conditions": [
+         ['OS=="win"', { #windows needs include dirs passed to MSBUILD this way
+            'include_dirs': [              
+              '<!@(pkg-config --cflags "opencv >= 2.3.1" )'
+            ],
+          }],
         ['OS=="mac"', {
           # cflags on OS X are stupid and have to be defined like this
           'xcode_settings': {
@@ -33,8 +38,6 @@
             , "GCC_ENABLE_CPP_EXCEPTIONS": "YES"
           }
         }]        
-      
     ]
   }]
 }
-
